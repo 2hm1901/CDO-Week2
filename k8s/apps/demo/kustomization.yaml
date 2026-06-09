@@ -3,14 +3,14 @@ kind: Kustomization
 
 # Kustomize gom các manifest của app thành một desired state để ArgoCD apply.
 resources:
-  - namespace.yaml
-  - deployment.yaml
-  - service.yaml
-  - service-monitor.yaml
-  - prometheus-rule.yaml
+- namespace.yaml
+- deployment.yaml
+- service.yaml
+- service-monitor.yaml
+- prometheus-rule.yaml
 
 # GitHub Actions sẽ cập nhật image tag sau mỗi lần merge vào main.
 images:
-  - name: cdo-demo-app
-    newName: ghcr.io/2hm1901/cdo-demo-app
-    newTag: dev
+- name: cdo-demo-app
+  newName: ghcr.io/2hm1901/cdo-demo-app
+  newTag: 1b5cbae7329dad0432bde8d6089eb6f4e56d30f9
