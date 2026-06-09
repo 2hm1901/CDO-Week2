@@ -1,0 +1,25 @@
+grafana:
+  # Password lab cố định để dễ đăng nhập; không dùng cấu hình này cho production.
+  adminPassword: admin123
+  additionalDataSources:
+    # Thêm Loki datasource để Grafana query log bằng LogQL.
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki-gateway.observability.svc.cluster.local
+      isDefault: false
+
+prometheus:
+  prometheusSpec:
+    # Cho phép Prometheus chọn ServiceMonitor/PrometheusRule ngoài namespace Helm release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    # Retention ngắn để giảm disk usage trong lab.
+    retention: 6h
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi

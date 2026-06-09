@@ -1,0 +1,6 @@
+# Copy file này thành terraform.tfvars rồi thay giá trị cho môi trường của bạn.
+aws_region       = "ap-southeast-1"
+project_name     = "cdo-week2"
+instance_type    = "t3.large"
+allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+ssh_key_output_dir = "generated"

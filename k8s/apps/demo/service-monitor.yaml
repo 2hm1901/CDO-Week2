@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cdo-demo-app
+  namespace: cdo-demo
+  labels:
+    # Label này khớp selector mặc định trong kube-prometheus-stack values.
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: cdo-demo-app
+  namespaceSelector:
+    matchNames:
+      - cdo-demo
+  endpoints:
+    - port: http
+      # App expose Prometheus metrics ở /metrics.
+      path: /metrics
+      interval: 15s

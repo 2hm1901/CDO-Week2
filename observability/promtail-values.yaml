@@ -1,0 +1,4 @@
+config:
+  clients:
+    # Promtail đẩy log container vào Loki qua gateway service trong namespace observability.
+    - url: http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push

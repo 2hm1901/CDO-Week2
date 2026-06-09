@@ -1,0 +1,40 @@
+# SingleBinary là mode đơn giản nhất cho lab một node.
+deploymentMode: SingleBinary
+
+loki:
+  # Tắt auth nội bộ vì Loki chỉ dùng trong cluster lab.
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  storage:
+    type: filesystem
+
+singleBinary:
+  replicas: 1
+
+# Tắt các mode distributed vì lab không cần Loki production topology.
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+chunksCache:
+  # Tắt cache để giảm RAM trên EC2 t3.large.
+  enabled: false
+resultsCache:
+  enabled: false
+
+gateway:
+  # Gateway tạo endpoint ổn định cho Grafana và Promtail.
+  enabled: true

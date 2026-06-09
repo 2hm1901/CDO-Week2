@@ -1,0 +1,15 @@
+# Local Python bytecode/cache.
+__pycache__/
+*.py[cod]
+
+# Terraform local state and provider cache should not be committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+terraform/generated/
+
+# Local OS/editor files.
+.DS_Store
+.idea/
+.vscode/
