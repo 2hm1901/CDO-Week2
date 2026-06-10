@@ -28,7 +28,12 @@ rm -f kubectl
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # Start Minikube dưới user ubuntu để kubeconfig nằm ở /home/ubuntu/.kube/config.
-sudo -iu ubuntu minikube start --driver=docker --cpus=4 --memory=8192 --disk-size=25g
+# CPU/RAM được truyền từ Terraform để khớp instance type. t3.large chỉ có 2 vCPU.
+sudo -iu ubuntu minikube start \
+  --driver=docker \
+  --cpus=${minikube_cpus} \
+  --memory=${minikube_memory_mb} \
+  --disk-size=${minikube_disk_size}
 
 # Chuẩn bị Helm repo thường dùng trong lab để người học có thể chạy ngay.
 sudo -iu ubuntu helm repo add prometheus-community https://prometheus-community.github.io/helm-charts

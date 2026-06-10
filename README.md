@@ -114,7 +114,11 @@ Sửa `terraform.tfvars`:
 aws_region       = "ap-southeast-1"
 project_name     = "cdo-week2"
 instance_type    = "t3.large"
+ubuntu_release   = "24.04"
 allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+minikube_cpus    = 2
+minikube_memory_mb = 6144
+minikube_disk_size = "25g"
 ssh_key_output_dir = "generated"
 ```
 
@@ -161,6 +165,18 @@ sudo tail -f /var/log/cdo-week2-user-data.log
 test -f /var/log/cdo-week2-ready && echo ready
 minikube status
 kubectl get nodes
+```
+
+Nếu EC2 đã được tạo từ version cũ của repo và user-data fail với lỗi `RSRC_INSUFFICIENT_CORES`, chạy thủ công trên EC2:
+
+```bash
+sudo -iu ubuntu minikube start --driver=docker --cpus=2 --memory=6144 --disk-size=25g
+sudo -iu ubuntu helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+sudo -iu ubuntu helm repo add grafana https://grafana.github.io/helm-charts
+sudo -iu ubuntu helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+sudo -iu ubuntu helm repo update
+sudo -iu ubuntu git clone https://github.com/2hm1901/CDO-Week2.git /home/ubuntu/CDO-Week2 || true
+sudo touch /var/log/cdo-week2-ready
 ```
 
 Repo đã được clone sẵn ở:

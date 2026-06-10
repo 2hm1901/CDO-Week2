@@ -22,20 +22,10 @@ data "aws_subnets" "default" {
   }
 }
 
-# Ubuntu LTS chính thức từ Canonical, dùng amd64 cho t3.large.
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-*-24.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
+# Ubuntu LTS chính thức từ Canonical qua AWS public SSM parameter.
+# Cách này ổn định hơn aws_ami name filter vì Canonical có thể đổi pattern AMI name theo region/release.
+data "aws_ssm_parameter" "ubuntu_ami" {
+  name = "/aws/service/canonical/ubuntu/server/${var.ubuntu_release}/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
 # Tạo SSH key pair bằng tls provider để người học không cần chuẩn bị key trước.
@@ -94,13 +84,17 @@ resource "aws_security_group" "lab" {
 
 # EC2 host chạy Docker + Minikube. User data sẽ bootstrap các tool cần cho lab.
 resource "aws_instance" "lab" {
-  ami                         = data.aws_ami.ubuntu.id
+  ami                         = data.aws_ssm_parameter.ubuntu_ami.value
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
   vpc_security_group_ids      = [aws_security_group.lab.id]
   key_name                    = aws_key_pair.lab.key_name
   associate_public_ip_address = true
-  user_data                   = file("${path.module}/user_data.sh")
+  user_data = templatefile("${path.module}/user_data.sh", {
+    minikube_cpus      = var.minikube_cpus
+    minikube_memory_mb = var.minikube_memory_mb
+    minikube_disk_size = var.minikube_disk_size
+  })
 
   root_block_device {
     volume_size = var.root_volume_size

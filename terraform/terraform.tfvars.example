@@ -2,5 +2,9 @@
 aws_region       = "ap-southeast-1"
 project_name     = "cdo-week2"
 instance_type    = "t3.large"
+ubuntu_release   = "24.04"
 allowed_ssh_cidr = "YOUR_PUBLIC_IP/32"
+minikube_cpus    = 2
+minikube_memory_mb = 6144
+minikube_disk_size = "25g"
 ssh_key_output_dir = "generated"
