@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: cdo-be-canary-analysis
+  namespace: cdo-be
+spec:
+  metrics:
+    - name: error-rate
+      # Abort criteria: nếu error ratio 5xx >= 5% trong cửa sổ 1 phút, analysis fail.
+      interval: 30s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 0.05
+      failureCondition: result[0] >= 0.05
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            (
+              sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[1m]))
+              or vector(0)
+            )
+            /
+            clamp_min(sum(rate(http_requests_total{namespace="cdo-be"}[1m])), 0.001)
+    - name: availability-burn-rate
+      # Integration với SLO burn rate: recording rule cdo_be:availability_error_ratio:5m
+      # đến từ k8s/apps/be/prometheus-rule.yaml. Burn rate >= 2 lần budget thì fail.
+      interval: 30s
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 2
+      failureCondition: result[0] >= 2
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            (
+              cdo_be:availability_error_ratio:5m
+              or vector(0)
+            )
+            /
+            0.01

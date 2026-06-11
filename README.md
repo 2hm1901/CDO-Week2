@@ -18,6 +18,7 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - Cài kube-prometheus-stack, Loki, Promtail, OpenTelemetry Collector.
 - Query request rate, error rate, latency, logs.
 - Tạo availability SLO, latency SLO và burn rate alert.
+- Thực hành Progressive Delivery với Argo Rollouts canary, AnalysisTemplate, Prometheus query và abort criteria.
 
 ## Cấu Trúc Dự Án
 
@@ -47,6 +48,11 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 │           ├── service.yaml
 │           ├── service-monitor.yaml
 │           └── prometheus-rule.yaml
+│       ├── be-canary/
+│           ├── kustomization.yaml
+│           ├── delete-deployment.yaml
+│           ├── rollout.yaml
+│           └── analysis-template.yaml
 │       └── fe/
 │           ├── kustomization.yaml
 │           ├── namespace.yaml
@@ -88,6 +94,9 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [k8s/apps/be/service.yaml](./k8s/apps/be/service.yaml): Service nội bộ cho BE.
 - [k8s/apps/be/service-monitor.yaml](./k8s/apps/be/service-monitor.yaml): cấu hình Prometheus Operator scrape `/metrics`.
 - [k8s/apps/be/prometheus-rule.yaml](./k8s/apps/be/prometheus-rule.yaml): recording rules và burn rate alerts cho availability/latency SLO.
+- [k8s/apps/be-canary/kustomization.yaml](./k8s/apps/be-canary/kustomization.yaml): overlay Progressive Delivery, thay Deployment BE bằng Argo Rollouts `Rollout`.
+- [k8s/apps/be-canary/rollout.yaml](./k8s/apps/be-canary/rollout.yaml): Rollout CRD định nghĩa canary steps 20% -> 50% -> 100%.
+- [k8s/apps/be-canary/analysis-template.yaml](./k8s/apps/be-canary/analysis-template.yaml): AnalysisTemplate query Prometheus để abort canary nếu error rate hoặc burn rate vượt ngưỡng.
 - [k8s/apps/fe/kustomization.yaml](./k8s/apps/fe/kustomization.yaml): Kustomize entrypoint cho FE app.
 - [k8s/apps/fe/configmap.yaml](./k8s/apps/fe/configmap.yaml): HTML/JS frontend gọi BE API.
 - [k8s/apps/fe/deployment.yaml](./k8s/apps/fe/deployment.yaml): Deployment nginx phục vụ FE.
@@ -564,7 +573,247 @@ Mở:
 http://localhost:9090/alerts
 ```
 
-## 13. Dọn AWS Resources
+## 13. Progressive Delivery: Canary Với Argo Rollouts
+
+Phần này là extension sau khi bạn đã có:
+
+- ArgoCD chạy.
+- `cdo-be-app` và `cdo-fe-app` đã sync.
+- Prometheus đang scrape BE metrics.
+
+Tài liệu chính thức tham khảo:
+
+- Argo Rollouts installation: <https://argo-rollouts.readthedocs.io/en/stable/installation/>
+- Argo Rollouts analysis: <https://argo-rollouts.readthedocs.io/en/stable/features/analysis/>
+
+### 13.1 Cài Argo Rollouts Controller
+
+Chạy trên EC2:
+
+```bash
+kubectl create namespace argo-rollouts
+kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+kubectl -n argo-rollouts rollout status deploy/argo-rollouts
+```
+
+Tuỳ chọn cài CLI plugin:
+
+```bash
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+chmod +x kubectl-argo-rollouts-linux-amd64
+sudo mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+kubectl argo rollouts version
+```
+
+### 13.2 Progressive Delivery Overlay
+
+Repo có thêm overlay:
+
+```text
+k8s/apps/be-canary/
+```
+
+Overlay này dùng lại base BE từ [k8s/apps/be](./k8s/apps/be/kustomization.yaml), xoá Deployment thường và thay bằng:
+
+- `Rollout`: [k8s/apps/be-canary/rollout.yaml](./k8s/apps/be-canary/rollout.yaml)
+- `AnalysisTemplate`: [k8s/apps/be-canary/analysis-template.yaml](./k8s/apps/be-canary/analysis-template.yaml)
+
+Canary steps:
+
+```yaml
+steps:
+  - setWeight: 20
+  - pause:
+      duration: 60s
+  - analysis:
+      templates:
+        - templateName: cdo-be-canary-analysis
+  - setWeight: 50
+  - pause:
+      duration: 120s
+  - analysis:
+      templates:
+        - templateName: cdo-be-canary-analysis
+  - setWeight: 100
+```
+
+Lưu ý: lab này chưa cài service mesh/ingress traffic manager. Vì vậy `setWeight` điều chỉnh tỷ lệ pod canary tương đối theo replica count, còn Service `cdo-be-app` vẫn route đến cả stable và canary pods. Đây vẫn đủ để học Rollout CRD, AnalysisTemplate, promote/abort.
+
+### 13.3 Chuyển BE App Sang Rollout Overlay
+
+Sửa [argocd/apps/be.yaml](./argocd/apps/be.yaml):
+
+```yaml
+path: k8s/apps/be-canary
+```
+
+Commit và push:
+
+```bash
+git checkout -b rollout/be-canary
+git add argocd/apps/be.yaml
+git commit -m "test: enable be canary rollout"
+git push origin rollout/be-canary
+```
+
+Mở PR, merge vào `main`, rồi trên EC2:
+
+```bash
+cd ~/CDO-Week2
+git pull
+```
+
+Sync root app để ArgoCD cập nhật child Application:
+
+```bash
+kubectl -n argocd patch application cdo-week2-root \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+```
+
+Sync BE app với prune để xoá Deployment cũ và thay bằng Rollout CRD:
+
+```bash
+kubectl -n argocd patch application cdo-be-app \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD","prune":true}}}'
+```
+
+Nếu sync bằng UI, tick **PRUNE** trong màn hình sync của `cdo-be-app`. Đây là bước quan trọng vì overlay canary xoá `Deployment/cdo-be-app` và thay bằng `Rollout/cdo-be-app`.
+
+Kiểm tra:
+
+```bash
+kubectl -n cdo-be get rollout,rs,pods,svc
+kubectl -n cdo-be describe rollout cdo-be-app
+```
+
+Nếu có CLI plugin:
+
+```bash
+kubectl argo rollouts get rollout cdo-be-app -n cdo-be --watch
+```
+
+### 13.4 AnalysisTemplate Và Abort Criteria
+
+AnalysisTemplate query Prometheus service nội bộ:
+
+```text
+http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+```
+
+Metric `error-rate` fail nếu 5xx ratio >= 5%:
+
+```promql
+(
+  sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[1m]))
+  or vector(0)
+)
+/
+clamp_min(sum(rate(http_requests_total{namespace="cdo-be"}[1m])), 0.001)
+```
+
+Metric `availability-burn-rate` dùng recording rule SLO:
+
+```promql
+(
+  cdo_be:availability_error_ratio:5m
+  or vector(0)
+)
+/
+0.01
+```
+
+Abort criteria trong lab:
+
+- `error-rate >= 0.05`: analysis fail.
+- `availability-burn-rate >= 2`: analysis fail.
+- `failureLimit: 1`: chỉ cần một lần fail là Rollout bị abort.
+
+### 13.5 Tạo Canary Thành Công
+
+Tạo một thay đổi BE lành mạnh, ví dụ sửa message trong `/` hoặc thêm log mới trong [app/main.py](./app/main.py). Merge vào `main`.
+
+GitHub Actions sẽ:
+
+- Build image `ghcr.io/2hm1901/cdo-be-app:<sha>`.
+- Update image tag ở:
+  - [k8s/apps/be/kustomization.yaml](./k8s/apps/be/kustomization.yaml)
+  - [k8s/apps/be-canary/kustomization.yaml](./k8s/apps/be-canary/kustomization.yaml)
+
+Sau khi ArgoCD sync, Rollout sẽ chạy:
+
+```text
+20% canary -> pause -> analysis -> 50% canary -> pause -> analysis -> 100%
+```
+
+Gửi traffic sạch trong lúc rollout:
+
+```bash
+for i in $(seq 1 300); do curl -s "http://localhost:8081/api/products" > /dev/null; done
+for i in $(seq 1 100); do curl -s -X POST "http://localhost:8081/api/orders" > /dev/null; done
+```
+
+Promote thủ công nếu rollout đang pause:
+
+```bash
+kubectl argo rollouts promote cdo-be-app -n cdo-be
+```
+
+### 13.6 Tạo Canary Fail Và Quan Sát Abort
+
+Trong lúc Rollout đang ở bước pause/analysis, tạo lỗi 5xx:
+
+```bash
+for i in $(seq 1 300); do curl -s "http://localhost:8081/fail" > /dev/null; done
+```
+
+Theo dõi:
+
+```bash
+kubectl -n cdo-be get analysisrun
+kubectl -n cdo-be describe analysisrun
+kubectl -n cdo-be describe rollout cdo-be-app
+```
+
+Nếu có CLI plugin:
+
+```bash
+kubectl argo rollouts get rollout cdo-be-app -n cdo-be --watch
+```
+
+Kỳ vọng:
+
+- AnalysisRun fail vì Prometheus query thấy error rate/burn rate vượt ngưỡng.
+- Rollout chuyển trạng thái degraded/aborted.
+- Canary ReplicaSet không được promote lên stable.
+
+Abort thủ công nếu cần:
+
+```bash
+kubectl argo rollouts abort cdo-be-app -n cdo-be
+```
+
+Rollback GitOps đúng cách:
+
+```bash
+git revert <bad_commit_sha>
+git push origin main
+```
+
+Sau đó sync ArgoCD để Rollout quay về image/tag tốt trước đó.
+
+### 13.7 Quay Lại Deployment Thường
+
+Nếu muốn kết thúc phần Progressive Delivery và quay lại manifest thường, sửa [argocd/apps/be.yaml](./argocd/apps/be.yaml):
+
+```yaml
+path: k8s/apps/be
+```
+
+Commit, push và sync lại `cdo-be-app`.
+
+## 14. Dọn AWS Resources
 
 Sau khi học xong, xoá EC2 và security group:
 
@@ -582,3 +831,6 @@ Nếu có image GHCR không cần dùng nữa, xoá package trong GitHub Package
 3. Khi nào dùng `git revert`, khi nào tạm dùng `kubectl rollout undo`?
 4. Workflow sau merge tự commit manifest thì cần tránh vòng lặp CI như thế nào?
 5. Vì sao burn rate alert cần nhiều cửa sổ thay vì chỉ một ngưỡng error rate?
+6. Argo Rollouts khác gì Deployment rolling update mặc định của Kubernetes?
+7. Vì sao AnalysisTemplate nên query Prometheus thay vì chỉ dựa vào readiness probe?
+8. Khi canary bị abort, rollback bằng Git khác gì abort trực tiếp bằng Rollouts CLI?

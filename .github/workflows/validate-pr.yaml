@@ -27,6 +27,8 @@ jobs:
           kustomize build k8s/apps/be > rendered.yaml
           printf "\n---\n" >> rendered.yaml
           kustomize build k8s/apps/fe >> rendered.yaml
+          printf "\n---\n" >> rendered.yaml
+          kustomize build k8s/apps/be-canary >> rendered.yaml
 
       - name: Validate manifests
         # ignore-missing-schemas=true vì CRD như ServiceMonitor/PrometheusRule không có sẵn trong schema core.

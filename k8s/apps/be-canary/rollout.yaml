@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: cdo-be-app
+  namespace: cdo-be
+  labels:
+    app: cdo-be-app
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: cdo-be-app
+  template:
+    metadata:
+      labels:
+        app: cdo-be-app
+    spec:
+      containers:
+        - name: app
+          # Kustomize thay image này bằng GHCR image/tag mới.
+          image: cdo-be-app:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+  strategy:
+    canary:
+      # Lab chưa cài service mesh/ingress traffic manager, nên setWeight điều chỉnh số pod canary
+      # tương đối theo replica count. Service cdo-be-app vẫn route tới cả stable và canary pods.
+      steps:
+        - setWeight: 20
+        - pause:
+            duration: 60s
+        - analysis:
+            templates:
+              - templateName: cdo-be-canary-analysis
+        - setWeight: 50
+        - pause:
+            duration: 120s
+        - analysis:
+            templates:
+              - templateName: cdo-be-canary-analysis
+        - setWeight: 100

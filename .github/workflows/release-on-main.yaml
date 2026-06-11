@@ -7,6 +7,7 @@ on:
     paths-ignore:
       # Tránh vòng lặp: workflow commit update image tag không tự kích hoạt lại chính nó.
       - "k8s/apps/be/kustomization.yaml"
+      - "k8s/apps/be-canary/kustomization.yaml"
 
 permissions:
   # contents: write để commit lại manifest, packages: write để push image lên GHCR.
@@ -45,9 +46,16 @@ jobs:
         # Kustomize chỉ sửa trường images, không rewrite toàn bộ manifest khác.
         run: kustomize edit set image cdo-be-app=ghcr.io/${{ github.repository_owner }}/cdo-be-app:${{ github.sha }}
 
+      - name: Update canary image tag
+        working-directory: k8s/apps/be-canary
+        # Overlay Rollout cũng cần cùng image tag để test progressive delivery.
+        run: kustomize edit set image cdo-be-app=ghcr.io/${{ github.repository_owner }}/cdo-be-app:${{ github.sha }}
+
       - name: Commit manifest update
         # Commit này là desired state mới để ArgoCD sync vào cluster.
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update cdo be image to ${{ github.sha }}"
-          file_pattern: k8s/apps/be/kustomization.yaml
+          file_pattern: |
+            k8s/apps/be/kustomization.yaml
+            k8s/apps/be-canary/kustomization.yaml
