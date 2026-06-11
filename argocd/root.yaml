@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdo-week2-root
+  namespace: argocd
+spec:
+  # Root app dùng default project cho lab. Trong production thường tạo AppProject riêng.
+  project: default
+  source:
+    # Root app đọc chính repo này để tạo các child Application.
+    repoURL: https://github.com/2hm1901/CDO-Week2.git
+    targetRevision: main
+    # Thư mục này chứa các ArgoCD Application con.
+    path: argocd/apps
+  destination:
+    # Child Application là CRD nằm trong namespace argocd.
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    syncOptions:
+      # Namespace argocd đã tồn tại sau bước cài ArgoCD, option này giữ root app dễ bootstrap.
+      - CreateNamespace=true

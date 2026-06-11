@@ -34,6 +34,7 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 │   ├── main.py
 │   └── requirements.txt
 ├── argocd/
+│   ├── root.yaml
 │   └── apps/
 │       └── demo.yaml
 ├── k8s/
@@ -71,7 +72,8 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [app/main.py](./app/main.py): app FastAPI demo, expose `/metrics`, `/work`, `/fail`, `/healthz`, log request và tạo Prometheus metric.
 - [app/Dockerfile](./app/Dockerfile): build container image cho app demo.
 - [app/requirements.txt](./app/requirements.txt): dependency Python của app.
-- [argocd/apps/demo.yaml](./argocd/apps/demo.yaml): ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/demo`.
+- [argocd/root.yaml](./argocd/root.yaml): root ArgoCD Application áp dụng pattern app-of-apps, trỏ vào thư mục `argocd/apps`.
+- [argocd/apps/demo.yaml](./argocd/apps/demo.yaml): child ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/demo`.
 - [k8s/apps/demo/kustomization.yaml](./k8s/apps/demo/kustomization.yaml): Kustomize entrypoint, gom manifest và quản lý image tag.
 - [k8s/apps/demo/namespace.yaml](./k8s/apps/demo/namespace.yaml): namespace `cdo-demo`.
 - [k8s/apps/demo/deployment.yaml](./k8s/apps/demo/deployment.yaml): Deployment chạy app demo.
@@ -306,16 +308,24 @@ Login Grafana:
 
 Import dashboard từ [observability/grafana-dashboard-demo.json](./observability/grafana-dashboard-demo.json).
 
-## 5. Deploy App Bằng ArgoCD
+## 5. Deploy App Bằng ArgoCD App-Of-Apps
 
-Apply ArgoCD Application:
+Apply root ArgoCD Application:
 
 ```bash
 cd ~/CDO-Week2
-kubectl apply -f argocd/apps/demo.yaml
+kubectl apply -f argocd/root.yaml
 ```
 
-Sync bằng UI hoặc CLI:
+Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo child Application `cdo-demo-app`. Sync root app trước:
+
+```bash
+kubectl -n argocd patch application cdo-week2-root \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+```
+
+Sau đó sync child app bằng UI hoặc CLI:
 
 ```bash
 kubectl -n argocd patch application cdo-demo-app \
@@ -327,6 +337,7 @@ Kiểm tra app:
 
 ```bash
 kubectl -n cdo-demo get pods,svc
+kubectl -n argocd get applications
 kubectl -n cdo-demo port-forward svc/cdo-demo-app 8081:80
 ```
 
