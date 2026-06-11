@@ -13,4 +13,4 @@ resources:
 images:
 - name: cdo-demo-app
   newName: ghcr.io/2hm1901/cdo-demo-app
-  newTag: ae64a1ec3aee7fdfa504371f8186287673c42e45
+  newTag: 1e779e7193fdbfdb41c7754052ee6f1f25deafb7
