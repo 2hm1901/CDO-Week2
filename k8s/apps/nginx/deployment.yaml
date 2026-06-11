@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdo-nginx-app
+  namespace: cdo-nginx
+  labels:
+    app: cdo-nginx-app
+spec:
+  # Một replica là đủ cho app phụ dùng để minh hoạ app-of-apps.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cdo-nginx-app
+  template:
+    metadata:
+      labels:
+        app: cdo-nginx-app
+    spec:
+      containers:
+        - name: nginx
+          # Kustomize thay tag image nginx tại kustomization.yaml.
+          image: nginx:1.27.3-alpine
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: nginx-content
+              mountPath: /usr/share/nginx/html/index.html
+              subPath: index.html
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: nginx-content
+          configMap:
+            name: cdo-nginx-content

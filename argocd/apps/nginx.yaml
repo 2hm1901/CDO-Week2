@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdo-nginx-app
+  namespace: argocd
+spec:
+  # Child app thứ hai để minh hoạ app-of-apps quản lý nhiều Application.
+  project: default
+  source:
+    # Git là desired state của nginx app.
+    repoURL: https://github.com/2hm1901/CDO-Week2.git
+    targetRevision: main
+    # Manifest Kustomize riêng của nginx app.
+    path: k8s/apps/nginx
+  destination:
+    # Deploy nginx app vào namespace riêng để tách khỏi backend demo.
+    server: https://kubernetes.default.svc
+    namespace: cdo-nginx
+  syncPolicy:
+    syncOptions:
+      # Cho phép child app tự tạo namespace đích.
+      - CreateNamespace=true

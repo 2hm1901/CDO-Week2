@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cdo-nginx-app
+  namespace: cdo-nginx
+  labels:
+    app: cdo-nginx-app
+spec:
+  selector:
+    app: cdo-nginx-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

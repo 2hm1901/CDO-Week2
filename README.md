@@ -36,16 +36,23 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 ├── argocd/
 │   ├── root.yaml
 │   └── apps/
-│       └── demo.yaml
+│       ├── demo.yaml
+│       └── nginx.yaml
 ├── k8s/
 │   └── apps/
-│       └── demo/
+│       ├── demo/
 │           ├── kustomization.yaml
 │           ├── namespace.yaml
 │           ├── deployment.yaml
 │           ├── service.yaml
 │           ├── service-monitor.yaml
 │           └── prometheus-rule.yaml
+│       └── nginx/
+│           ├── kustomization.yaml
+│           ├── namespace.yaml
+│           ├── configmap.yaml
+│           ├── deployment.yaml
+│           └── service.yaml
 ├── observability/
 │   ├── kube-prometheus-stack-values.yaml
 │   ├── loki-values.yaml
@@ -74,12 +81,17 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [app/requirements.txt](./app/requirements.txt): dependency Python của app.
 - [argocd/root.yaml](./argocd/root.yaml): root ArgoCD Application áp dụng pattern app-of-apps, trỏ vào thư mục `argocd/apps`.
 - [argocd/apps/demo.yaml](./argocd/apps/demo.yaml): child ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/demo`.
+- [argocd/apps/nginx.yaml](./argocd/apps/nginx.yaml): child ArgoCD Application thứ hai, trỏ vào path `k8s/apps/nginx`.
 - [k8s/apps/demo/kustomization.yaml](./k8s/apps/demo/kustomization.yaml): Kustomize entrypoint, gom manifest và quản lý image tag.
 - [k8s/apps/demo/namespace.yaml](./k8s/apps/demo/namespace.yaml): namespace `cdo-demo`.
 - [k8s/apps/demo/deployment.yaml](./k8s/apps/demo/deployment.yaml): Deployment chạy app demo.
 - [k8s/apps/demo/service.yaml](./k8s/apps/demo/service.yaml): Service nội bộ cho app.
 - [k8s/apps/demo/service-monitor.yaml](./k8s/apps/demo/service-monitor.yaml): cấu hình Prometheus Operator scrape `/metrics`.
 - [k8s/apps/demo/prometheus-rule.yaml](./k8s/apps/demo/prometheus-rule.yaml): recording rules và burn rate alerts cho availability/latency SLO.
+- [k8s/apps/nginx/kustomization.yaml](./k8s/apps/nginx/kustomization.yaml): Kustomize entrypoint cho app nginx thứ hai.
+- [k8s/apps/nginx/configmap.yaml](./k8s/apps/nginx/configmap.yaml): nội dung HTML custom cho nginx.
+- [k8s/apps/nginx/deployment.yaml](./k8s/apps/nginx/deployment.yaml): Deployment nginx.
+- [k8s/apps/nginx/service.yaml](./k8s/apps/nginx/service.yaml): Service nội bộ cho nginx.
 - [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml): Helm values cài Prometheus, Alertmanager, Grafana và Loki datasource.
 - [observability/loki-values.yaml](./observability/loki-values.yaml): Helm values cài Loki mode SingleBinary cho lab.
 - [observability/promtail-values.yaml](./observability/promtail-values.yaml): Helm values cài Promtail để đẩy container logs vào Loki.
@@ -317,7 +329,12 @@ cd ~/CDO-Week2
 kubectl apply -f argocd/root.yaml
 ```
 
-Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo child Application `cdo-demo-app`. Sync root app trước:
+Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo hai child Application:
+
+- `cdo-demo-app`: backend demo có metrics/logs/SLO.
+- `cdo-nginx-app`: nginx app đơn giản để minh hoạ app-of-apps có nhiều app.
+
+Sync root app trước:
 
 ```bash
 kubectl -n argocd patch application cdo-week2-root \
@@ -325,18 +342,23 @@ kubectl -n argocd patch application cdo-week2-root \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
 
-Sau đó sync child app bằng UI hoặc CLI:
+Sau đó sync từng child app bằng UI hoặc CLI:
 
 ```bash
 kubectl -n argocd patch application cdo-demo-app \
   --type merge \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+
+kubectl -n argocd patch application cdo-nginx-app \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
 
-Kiểm tra app:
+Kiểm tra apps:
 
 ```bash
 kubectl -n cdo-demo get pods,svc
+kubectl -n cdo-nginx get pods,svc
 kubectl -n argocd get applications
 kubectl -n cdo-demo port-forward svc/cdo-demo-app 8081:80
 ```
@@ -346,6 +368,13 @@ Từ một terminal khác trên EC2:
 ```bash
 curl http://localhost:8081/
 curl http://localhost:8081/metrics
+```
+
+Kiểm tra nginx app:
+
+```bash
+kubectl -n cdo-nginx port-forward svc/cdo-nginx-app 8082:80
+curl http://localhost:8082/
 ```
 
 ## 6. Pull Request: Validate Manifest
