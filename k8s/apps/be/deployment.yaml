@@ -7,7 +7,7 @@ metadata:
     app: cdo-be-app
 spec:
   # Dùng 2 replicas để có thể quan sát rollout và scale drift rõ hơn.
-  replicas: "4"
+  replicas: 4
   selector:
     matchLabels:
       app: cdo-be-app
