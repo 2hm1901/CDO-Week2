@@ -1,0 +1,117 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cdo-be-slo
+  namespace: cdo-be
+  labels:
+    # Prometheus Operator chỉ nạp rule có label khớp Helm release.
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: cdo-be.slo
+      rules:
+        # Availability SLO 99% nghĩa là error budget 1%.
+        - record: cdo_be:availability_error_ratio:5m
+          expr: |
+            sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{namespace="cdo-be"}[5m]))
+        - record: cdo_be:availability_error_ratio:30m
+          expr: |
+            sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[30m]))
+            /
+            sum(rate(http_requests_total{namespace="cdo-be"}[30m]))
+        - record: cdo_be:availability_error_ratio:1h
+          expr: |
+            sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total{namespace="cdo-be"}[1h]))
+        - record: cdo_be:availability_error_ratio:6h
+          expr: |
+            sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[6h]))
+            /
+            sum(rate(http_requests_total{namespace="cdo-be"}[6h]))
+        # Latency SLO 95% request <= 500 ms, nên latency error budget là 5%.
+        - record: cdo_be:latency_error_ratio:5m
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[5m]))
+              -
+              sum(rate(http_request_duration_seconds_bucket{namespace="cdo-be",le="0.5"}[5m]))
+            )
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[5m]))
+        - record: cdo_be:latency_error_ratio:30m
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[30m]))
+              -
+              sum(rate(http_request_duration_seconds_bucket{namespace="cdo-be",le="0.5"}[30m]))
+            )
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[30m]))
+        - record: cdo_be:latency_error_ratio:1h
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[1h]))
+              -
+              sum(rate(http_request_duration_seconds_bucket{namespace="cdo-be",le="0.5"}[1h]))
+            )
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[1h]))
+        - record: cdo_be:latency_error_ratio:6h
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[6h]))
+              -
+              sum(rate(http_request_duration_seconds_bucket{namespace="cdo-be",le="0.5"}[6h]))
+            )
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="cdo-be"}[6h]))
+        - alert: CdoBeAvailabilityFastBurn
+          expr: |
+            # Fast burn dùng 5m và 1h để bắt sự cố nghiêm trọng nhanh.
+            cdo_be:availability_error_ratio:5m > (14.4 * 0.01)
+            and
+            cdo_be:availability_error_ratio:1h > (14.4 * 0.01)
+          for: 2m
+          labels:
+            severity: critical
+            slo: availability
+          annotations:
+            summary: CDO BE availability SLO fast burn
+        - alert: CdoBeAvailabilitySlowBurn
+          expr: |
+            # Slow burn dùng 30m và 6h để bắt lỗi âm ỉ nhưng kéo dài.
+            cdo_be:availability_error_ratio:30m > (6 * 0.01)
+            and
+            cdo_be:availability_error_ratio:6h > (6 * 0.01)
+          for: 15m
+          labels:
+            severity: warning
+            slo: availability
+          annotations:
+            summary: CDO BE availability SLO slow burn
+        - alert: CdoBeLatencyFastBurn
+          expr: |
+            # 0.05 là error budget của latency SLO 95%.
+            cdo_be:latency_error_ratio:5m > (14.4 * 0.05)
+            and
+            cdo_be:latency_error_ratio:1h > (14.4 * 0.05)
+          for: 2m
+          labels:
+            severity: critical
+            slo: latency
+          annotations:
+            summary: CDO BE latency SLO fast burn
+        - alert: CdoBeLatencySlowBurn
+          expr: |
+            cdo_be:latency_error_ratio:30m > (6 * 0.05)
+            and
+            cdo_be:latency_error_ratio:6h > (6 * 0.05)
+          for: 15m
+          labels:
+            severity: warning
+            slo: latency
+          annotations:
+            summary: CDO BE latency SLO slow burn

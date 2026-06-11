@@ -23,7 +23,10 @@ jobs:
 
       - name: Render manifests
         # Render trước để phát hiện lỗi Kustomize trước khi merge.
-        run: kustomize build k8s/apps/demo > rendered.yaml
+        run: |
+          kustomize build k8s/apps/be > rendered.yaml
+          printf "\n---\n" >> rendered.yaml
+          kustomize build k8s/apps/fe >> rendered.yaml
 
       - name: Validate manifests
         # ignore-missing-schemas=true vì CRD như ServiceMonitor/PrometheusRule không có sẵn trong schema core.

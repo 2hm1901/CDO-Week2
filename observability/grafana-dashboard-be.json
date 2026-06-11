@@ -27,7 +27,7 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{namespace=\"cdo-demo\"}[5m]))",
+          "expr": "sum(rate(http_requests_total{namespace=\"cdo-be\"}[5m]))",
           "legendFormat": "request rate"
         }
       ],
@@ -54,7 +54,7 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{namespace=\"cdo-demo\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{namespace=\"cdo-demo\"}[5m]))",
+          "expr": "sum(rate(http_requests_total{namespace=\"cdo-be\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{namespace=\"cdo-be\"}[5m]))",
           "legendFormat": "error ratio"
         }
       ],
@@ -81,7 +81,7 @@
       "id": 3,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace=\"cdo-demo\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace=\"cdo-be\"}[5m])))",
           "legendFormat": "p95 latency"
         }
       ],
@@ -102,7 +102,7 @@
       "id": 4,
       "targets": [
         {
-          "expr": "{namespace=\"cdo-demo\", app=\"cdo-demo-app\"}"
+          "expr": "{namespace=\"cdo-be\", app=\"cdo-be-app\"}"
         }
       ],
       "title": "Application Logs",
@@ -123,8 +123,8 @@
     "from": "now-30m",
     "to": "now"
   },
-  "title": "CDO Demo App",
-  "uid": "cdo-demo-app",
+  "title": "CDO BE App",
+  "uid": "cdo-be-app",
   "version": 1,
   "weekStart": ""
 }

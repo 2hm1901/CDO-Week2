@@ -2,12 +2,12 @@
 
 Repo: <https://github.com/2hm1901/CDO-Week2>
 
-Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài Docker, Minikube, kubectl, Helm và clone repo này vào máy. Trên Minikube, lab cài ArgoCD, deploy app demo bằng GitOps, cài Prometheus/Grafana/Loki/OpenTelemetry Collector, rồi thực hành drift, rollback, SLO và burn rate alert.
+Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài Docker, Minikube, kubectl, Helm và clone repo này vào máy. Trên Minikube, lab cài ArgoCD, deploy app BE/FE bằng GitOps, cài Prometheus/Grafana/Loki/OpenTelemetry Collector, rồi thực hành drift, rollback, SLO và burn rate alert.
 
 ## Mục Tiêu
 
 - Cài ArgoCD trên Minikube chạy trong EC2 AWS.
-- Deploy app backend demo có metrics endpoint, log stdout, endpoint tạo lỗi và latency giả lập.
+- Deploy app backend có metrics endpoint, API thật, log stdout, endpoint tạo lỗi và latency giả lập.
 - Lưu Kubernetes manifest trong GitOps repo.
 - Dùng GitHub Actions validate manifest khi Pull Request.
 - Sau khi merge vào `main`, build image, push GHCR và update image tag trong manifest.
@@ -36,18 +36,18 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 ├── argocd/
 │   ├── root.yaml
 │   └── apps/
-│       ├── demo.yaml
-│       └── nginx.yaml
+│       ├── be.yaml
+│       └── fe.yaml
 ├── k8s/
 │   └── apps/
-│       ├── demo/
+│       ├── be/
 │           ├── kustomization.yaml
 │           ├── namespace.yaml
 │           ├── deployment.yaml
 │           ├── service.yaml
 │           ├── service-monitor.yaml
 │           └── prometheus-rule.yaml
-│       └── nginx/
+│       └── fe/
 │           ├── kustomization.yaml
 │           ├── namespace.yaml
 │           ├── configmap.yaml
@@ -58,7 +58,7 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 │   ├── loki-values.yaml
 │   ├── promtail-values.yaml
 │   ├── otel-collector-values.yaml
-│   └── grafana-dashboard-demo.json
+│   └── grafana-dashboard-be.json
 └── terraform/
     ├── versions.tf
     ├── variables.tf
@@ -76,27 +76,27 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [terraform/outputs.tf](./terraform/outputs.tf): in ra public IP, lệnh SSH, lệnh SSH tunnel và đường dẫn key được tạo.
 - [terraform/user_data.sh](./terraform/user_data.sh): bootstrap EC2 bằng cách cài Docker, Minikube, kubectl, Helm, add Helm repo và clone repo lab.
 - [terraform/terraform.tfvars.example](./terraform/terraform.tfvars.example): file mẫu để tạo `terraform.tfvars`.
-- [app/main.py](./app/main.py): app FastAPI demo, expose `/metrics`, `/work`, `/fail`, `/healthz`, log request và tạo Prometheus metric.
-- [app/Dockerfile](./app/Dockerfile): build container image cho app demo.
+- [app/main.py](./app/main.py): app FastAPI BE, expose `/metrics`, `/api/products`, `/api/orders`, `/api/users/{id}`, `/api/checkout`, `/work`, `/fail`, `/healthz`, log request và tạo Prometheus metric.
+- [app/Dockerfile](./app/Dockerfile): build container image cho BE app.
 - [app/requirements.txt](./app/requirements.txt): dependency Python của app.
 - [argocd/root.yaml](./argocd/root.yaml): root ArgoCD Application áp dụng pattern app-of-apps, trỏ vào thư mục `argocd/apps`.
-- [argocd/apps/demo.yaml](./argocd/apps/demo.yaml): child ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/demo`.
-- [argocd/apps/nginx.yaml](./argocd/apps/nginx.yaml): child ArgoCD Application thứ hai, trỏ vào path `k8s/apps/nginx`.
-- [k8s/apps/demo/kustomization.yaml](./k8s/apps/demo/kustomization.yaml): Kustomize entrypoint, gom manifest và quản lý image tag.
-- [k8s/apps/demo/namespace.yaml](./k8s/apps/demo/namespace.yaml): namespace `cdo-demo`.
-- [k8s/apps/demo/deployment.yaml](./k8s/apps/demo/deployment.yaml): Deployment chạy app demo.
-- [k8s/apps/demo/service.yaml](./k8s/apps/demo/service.yaml): Service nội bộ cho app.
-- [k8s/apps/demo/service-monitor.yaml](./k8s/apps/demo/service-monitor.yaml): cấu hình Prometheus Operator scrape `/metrics`.
-- [k8s/apps/demo/prometheus-rule.yaml](./k8s/apps/demo/prometheus-rule.yaml): recording rules và burn rate alerts cho availability/latency SLO.
-- [k8s/apps/nginx/kustomization.yaml](./k8s/apps/nginx/kustomization.yaml): Kustomize entrypoint cho app nginx thứ hai.
-- [k8s/apps/nginx/configmap.yaml](./k8s/apps/nginx/configmap.yaml): nội dung HTML custom cho nginx.
-- [k8s/apps/nginx/deployment.yaml](./k8s/apps/nginx/deployment.yaml): Deployment nginx.
-- [k8s/apps/nginx/service.yaml](./k8s/apps/nginx/service.yaml): Service nội bộ cho nginx.
+- [argocd/apps/be.yaml](./argocd/apps/be.yaml): child ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/be`.
+- [argocd/apps/fe.yaml](./argocd/apps/fe.yaml): child ArgoCD Application thứ hai, trỏ vào path `k8s/apps/fe`.
+- [k8s/apps/be/kustomization.yaml](./k8s/apps/be/kustomization.yaml): Kustomize entrypoint, gom manifest BE và quản lý image tag.
+- [k8s/apps/be/namespace.yaml](./k8s/apps/be/namespace.yaml): namespace `cdo-be`.
+- [k8s/apps/be/deployment.yaml](./k8s/apps/be/deployment.yaml): Deployment chạy BE app.
+- [k8s/apps/be/service.yaml](./k8s/apps/be/service.yaml): Service nội bộ cho BE.
+- [k8s/apps/be/service-monitor.yaml](./k8s/apps/be/service-monitor.yaml): cấu hình Prometheus Operator scrape `/metrics`.
+- [k8s/apps/be/prometheus-rule.yaml](./k8s/apps/be/prometheus-rule.yaml): recording rules và burn rate alerts cho availability/latency SLO.
+- [k8s/apps/fe/kustomization.yaml](./k8s/apps/fe/kustomization.yaml): Kustomize entrypoint cho FE app.
+- [k8s/apps/fe/configmap.yaml](./k8s/apps/fe/configmap.yaml): HTML/JS frontend gọi BE API.
+- [k8s/apps/fe/deployment.yaml](./k8s/apps/fe/deployment.yaml): Deployment nginx phục vụ FE.
+- [k8s/apps/fe/service.yaml](./k8s/apps/fe/service.yaml): Service nội bộ cho FE.
 - [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml): Helm values cài Prometheus, Alertmanager, Grafana và Loki datasource.
 - [observability/loki-values.yaml](./observability/loki-values.yaml): Helm values cài Loki mode SingleBinary cho lab.
 - [observability/promtail-values.yaml](./observability/promtail-values.yaml): Helm values cài Promtail để đẩy container logs vào Loki.
 - [observability/otel-collector-values.yaml](./observability/otel-collector-values.yaml): Helm values cài OpenTelemetry Collector với OTLP receiver và debug exporter.
-- [observability/grafana-dashboard-demo.json](./observability/grafana-dashboard-demo.json): dashboard Grafana mẫu cho request rate, error rate, p95 latency và logs.
+- [observability/grafana-dashboard-be.json](./observability/grafana-dashboard-be.json): dashboard Grafana mẫu cho request rate, error rate, p95 latency và logs của BE.
 - [.github/workflows/validate-pr.yaml](./.github/workflows/validate-pr.yaml): workflow chạy khi Pull Request, render Kustomize và validate manifest bằng kubeconform.
 - [.github/workflows/release-on-main.yaml](./.github/workflows/release-on-main.yaml): workflow chạy khi merge vào `main`, build image, push GHCR và commit image tag mới vào manifest.
 - [.gitignore](./.gitignore): bỏ qua cache Python, Terraform state, provider cache và file local.
@@ -155,7 +155,7 @@ Sau khi apply xong, Terraform output sẽ in ra:
 
 - `public_ip`: IP public của EC2.
 - `ssh_command`: lệnh SSH vào EC2.
-- `tunnel_command`: lệnh SSH tunnel cho ArgoCD, Grafana, Prometheus.
+- `tunnel_command`: lệnh SSH tunnel cho ArgoCD, Grafana, Prometheus, BE và FE local ports.
 - `private_key_path`: đường dẫn private key được tạo trên máy local.
 - `public_key_path`: đường dẫn public key tương ứng.
 
@@ -210,17 +210,17 @@ https://github.com/2hm1901/CDO-Week2
 Image mặc định:
 
 ```text
-ghcr.io/2hm1901/cdo-demo-app:<git-sha>
+ghcr.io/2hm1901/cdo-be-app:<git-sha>
 ```
 
-Lưu ý GHCR: package image cần public để Minikube pull được mà không cần secret. Nếu package đang private, vào GitHub package settings và đổi visibility sang public, hoặc tạo `imagePullSecret` trong namespace `cdo-demo`.
+Lưu ý GHCR: package image cần public để Minikube pull được mà không cần secret. Nếu package đang private, vào GitHub package settings và đổi visibility sang public, hoặc tạo `imagePullSecret` trong namespace `cdo-be`.
 
 Trong GitHub repo, vào:
 
 - `Settings` -> `Actions` -> `General`.
 - `Workflow permissions`: chọn `Read and write permissions`.
 
-Workflow cần quyền này vì sau khi merge vào `main`, workflow sẽ commit lại file [k8s/apps/demo/kustomization.yaml](./k8s/apps/demo/kustomization.yaml) với image tag mới.
+Workflow cần quyền này vì sau khi merge vào `main`, workflow sẽ commit lại file [k8s/apps/be/kustomization.yaml](./k8s/apps/be/kustomization.yaml) với image tag mới.
 
 ## 3. Cài ArgoCD Trên Minikube
 
@@ -318,7 +318,7 @@ Login Grafana:
 - User: `admin`
 - Password: `admin123`
 
-Import dashboard từ [observability/grafana-dashboard-demo.json](./observability/grafana-dashboard-demo.json).
+Import dashboard từ [observability/grafana-dashboard-be.json](./observability/grafana-dashboard-be.json).
 
 ## 5. Deploy App Bằng ArgoCD App-Of-Apps
 
@@ -331,8 +331,8 @@ kubectl apply -f argocd/root.yaml
 
 Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo hai child Application:
 
-- `cdo-demo-app`: backend demo có metrics/logs/SLO.
-- `cdo-nginx-app`: nginx app đơn giản để minh hoạ app-of-apps có nhiều app.
+- `cdo-be-app`: backend API có metrics/logs/SLO.
+- `cdo-fe-app`: frontend tĩnh phục vụ bằng nginx, gọi BE API để tạo traffic/logs.
 
 Sync root app trước:
 
@@ -345,11 +345,11 @@ kubectl -n argocd patch application cdo-week2-root \
 Sau đó sync từng child app bằng UI hoặc CLI:
 
 ```bash
-kubectl -n argocd patch application cdo-demo-app \
+kubectl -n argocd patch application cdo-be-app \
   --type merge \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 
-kubectl -n argocd patch application cdo-nginx-app \
+kubectl -n argocd patch application cdo-fe-app \
   --type merge \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
@@ -357,10 +357,10 @@ kubectl -n argocd patch application cdo-nginx-app \
 Kiểm tra apps:
 
 ```bash
-kubectl -n cdo-demo get pods,svc
-kubectl -n cdo-nginx get pods,svc
+kubectl -n cdo-be get pods,svc
+kubectl -n cdo-fe get pods,svc
 kubectl -n argocd get applications
-kubectl -n cdo-demo port-forward svc/cdo-demo-app 8081:80
+kubectl -n cdo-be port-forward svc/cdo-be-app 8081:80
 ```
 
 Từ một terminal khác trên EC2:
@@ -370,12 +370,14 @@ curl http://localhost:8081/
 curl http://localhost:8081/metrics
 ```
 
-Kiểm tra nginx app:
+Kiểm tra FE app:
 
 ```bash
-kubectl -n cdo-nginx port-forward svc/cdo-nginx-app 8082:80
+kubectl -n cdo-fe port-forward svc/cdo-fe-app 8082:80
 curl http://localhost:8082/
 ```
+
+Nếu mở FE từ browser máy local, giữ SSH tunnel từ Terraform đang chạy. FE ở `http://localhost:8082` và mặc định gọi BE ở `http://localhost:8081`.
 
 ## 6. Pull Request: Validate Manifest
 
@@ -385,7 +387,7 @@ Tạo branch:
 git checkout -b test/replicas
 ```
 
-Sửa [k8s/apps/demo/deployment.yaml](./k8s/apps/demo/deployment.yaml):
+Sửa [k8s/apps/be/deployment.yaml](./k8s/apps/be/deployment.yaml):
 
 ```yaml
 replicas: 3
@@ -394,8 +396,8 @@ replicas: 3
 Commit, push và mở Pull Request:
 
 ```bash
-git add k8s/apps/demo/deployment.yaml
-git commit -m "test: change demo replicas"
+git add k8s/apps/be/deployment.yaml
+git commit -m "test: change be replicas"
 git push origin test/replicas
 ```
 
@@ -411,7 +413,7 @@ Khi merge PR vào `main`, workflow [release-on-main.yaml](./.github/workflows/re
 - Build Docker image từ [app/Dockerfile](./app/Dockerfile).
 - Push image lên GHCR.
 - Chạy `kustomize edit set image`.
-- Commit lại image tag mới vào [k8s/apps/demo/kustomization.yaml](./k8s/apps/demo/kustomization.yaml).
+- Commit lại image tag mới vào [k8s/apps/be/kustomization.yaml](./k8s/apps/be/kustomization.yaml).
 
 Sau commit update manifest, ArgoCD phát hiện desired state mới. Nếu auto-sync chưa bật, bấm `Sync` trong UI hoặc dùng CLI ở bước trước.
 
@@ -420,8 +422,8 @@ Sau commit update manifest, ArgoCD phát hiện desired state mới. Nếu auto-
 Sửa trực tiếp live state trong cluster:
 
 ```bash
-kubectl -n cdo-demo scale deploy/cdo-demo-app --replicas=1
-kubectl -n cdo-demo set env deploy/cdo-demo-app DRIFT_TEST=true
+kubectl -n cdo-be scale deploy/cdo-be-app --replicas=1
+kubectl -n cdo-be set env deploy/cdo-be-app DRIFT_TEST=true
 ```
 
 Quan sát trong ArgoCD:
@@ -433,7 +435,7 @@ Quan sát trong ArgoCD:
 Sync lại ArgoCD:
 
 ```bash
-kubectl -n argocd patch application cdo-demo-app \
+kubectl -n argocd patch application cdo-be-app \
   --type merge \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
@@ -463,9 +465,9 @@ ArgoCD thấy commit revert là desired state mới và sync cluster về manife
 Chạy:
 
 ```bash
-kubectl -n cdo-demo rollout history deploy/cdo-demo-app
-kubectl -n cdo-demo rollout undo deploy/cdo-demo-app
-kubectl -n cdo-demo rollout status deploy/cdo-demo-app
+kubectl -n cdo-be rollout history deploy/cdo-be-app
+kubectl -n cdo-be rollout undo deploy/cdo-be-app
+kubectl -n cdo-be rollout status deploy/cdo-be-app
 ```
 
 Điều xảy ra:
@@ -490,15 +492,15 @@ for i in $(seq 1 20); do curl -s "http://localhost:8081/work?delay_ms=900" > /de
 PromQL request rate:
 
 ```promql
-sum(rate(http_requests_total{namespace="cdo-demo"}[5m]))
+sum(rate(http_requests_total{namespace="cdo-be"}[5m]))
 ```
 
 PromQL error rate:
 
 ```promql
-sum(rate(http_requests_total{namespace="cdo-demo",status=~"5.."}[5m]))
+sum(rate(http_requests_total{namespace="cdo-be",status=~"5.."}[5m]))
 /
-sum(rate(http_requests_total{namespace="cdo-demo"}[5m]))
+sum(rate(http_requests_total{namespace="cdo-be"}[5m]))
 ```
 
 PromQL p95 latency:
@@ -506,25 +508,25 @@ PromQL p95 latency:
 ```promql
 histogram_quantile(
   0.95,
-  sum by (le) (rate(http_request_duration_seconds_bucket{namespace="cdo-demo"}[5m]))
+  sum by (le) (rate(http_request_duration_seconds_bucket{namespace="cdo-be"}[5m]))
 )
 ```
 
 LogQL tất cả log app:
 
 ```logql
-{namespace="cdo-demo", app="cdo-demo-app"}
+{namespace="cdo-be", app="cdo-be-app"}
 ```
 
 LogQL chỉ lỗi:
 
 ```logql
-{namespace="cdo-demo", app="cdo-demo-app"} |= "status=500"
+{namespace="cdo-be", app="cdo-be-app"} |= "status=500"
 ```
 
 ## 12. SLO Và Burn Rate Alert
 
-File [k8s/apps/demo/prometheus-rule.yaml](./k8s/apps/demo/prometheus-rule.yaml) định nghĩa:
+File [k8s/apps/be/prometheus-rule.yaml](./k8s/apps/be/prometheus-rule.yaml) định nghĩa:
 
 - Availability SLO: 99% request không lỗi 5xx, error budget 1%.
 - Latency SLO: 95% request có latency <= 500 ms, error budget 5%.

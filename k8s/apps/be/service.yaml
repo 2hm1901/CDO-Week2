@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cdo-demo-app
-  namespace: cdo-demo
+  name: cdo-be-app
+  namespace: cdo-be
   labels:
-    app: cdo-demo-app
+    app: cdo-be-app
 spec:
-  # Service chọn các pod có label app=cdo-demo-app.
+  # Service chọn các pod có label app=cdo-be-app.
   selector:
-    app: cdo-demo-app
+    app: cdo-be-app
   ports:
     - name: http
       # Port 80 giúp port-forward và ServiceMonitor dễ đọc hơn.

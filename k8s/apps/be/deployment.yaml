@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cdo-demo-app
-  namespace: cdo-demo
+  name: cdo-be-app
+  namespace: cdo-be
   labels:
-    app: cdo-demo-app
+    app: cdo-be-app
 spec:
   # Dùng 2 replicas để có thể quan sát rollout và scale drift rõ hơn.
   replicas: 3
   selector:
     matchLabels:
-      app: cdo-demo-app
+      app: cdo-be-app
   template:
     metadata:
       labels:
-        app: cdo-demo-app
+        app: cdo-be-app
     spec:
       containers:
         - name: app
           # Image logical name được Kustomize thay bằng GHCR image thật.
-          image: cdo-demo-app:dev
+          image: cdo-be-app:dev
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

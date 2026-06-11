@@ -1,5 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  # Namespace riêng cho app nginx thứ hai.
-  name: cdo-nginx

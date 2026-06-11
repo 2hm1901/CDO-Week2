@@ -6,7 +6,7 @@ on:
       - main
     paths-ignore:
       # Tránh vòng lặp: workflow commit update image tag không tự kích hoạt lại chính nó.
-      - "k8s/apps/demo/kustomization.yaml"
+      - "k8s/apps/be/kustomization.yaml"
 
 permissions:
   # contents: write để commit lại manifest, packages: write để push image lên GHCR.
@@ -35,19 +35,19 @@ jobs:
         with:
           context: app
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/cdo-demo-app:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/cdo-be-app:${{ github.sha }}
 
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
 
       - name: Update image tag
-        working-directory: k8s/apps/demo
+        working-directory: k8s/apps/be
         # Kustomize chỉ sửa trường images, không rewrite toàn bộ manifest khác.
-        run: kustomize edit set image cdo-demo-app=ghcr.io/${{ github.repository_owner }}/cdo-demo-app:${{ github.sha }}
+        run: kustomize edit set image cdo-be-app=ghcr.io/${{ github.repository_owner }}/cdo-be-app:${{ github.sha }}
 
       - name: Commit manifest update
         # Commit này là desired state mới để ArgoCD sync vào cluster.
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: update cdo demo image to ${{ github.sha }}"
-          file_pattern: k8s/apps/demo/kustomization.yaml
+          commit_message: "chore: update cdo be image to ${{ github.sha }}"
+          file_pattern: k8s/apps/be/kustomization.yaml

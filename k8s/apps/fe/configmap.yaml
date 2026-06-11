@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cdo-fe-content
+  namespace: cdo-fe
+data:
+  # Frontend tĩnh gọi BE API để tạo request/log thật cho observability lab.
+  index.html: |
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>CDO FE App</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 32px; color: #17202a; }
+          main { max-width: 920px; margin: 0 auto; }
+          button { margin: 6px 8px 6px 0; padding: 10px 14px; cursor: pointer; }
+          input { min-width: 320px; padding: 10px; }
+          pre { background: #111827; color: #d1fae5; padding: 16px; overflow: auto; }
+          .row { margin: 18px 0; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <h1>CDO Week 2 - FE App</h1>
+          <p>Static frontend served by nginx. Use the buttons to call BE APIs and generate real logs, metrics, and errors.</p>
+
+          <div class="row">
+            <label for="apiBase">BE API base URL</label><br>
+            <input id="apiBase" value="http://localhost:8081">
+          </div>
+
+          <div class="row">
+            <button onclick="callApi('/api/products')">List Products</button>
+            <button onclick="callApi('/api/users/3')">Get User</button>
+            <button onclick="callApi('/api/users/5')">User 404</button>
+            <button onclick="callApi('/api/orders', {method: 'POST'})">Create Order</button>
+            <button onclick="callApi('/api/checkout?fail_percent=50', {method: 'POST'})">Checkout</button>
+            <button onclick="callApi('/fail')">Force 500</button>
+          </div>
+
+          <pre id="output">Waiting for a request...</pre>
+        </main>
+
+        <script>
+          async function callApi(path, options = {}) {
+            const base = document.getElementById('apiBase').value.replace(/\/$/, '');
+            const output = document.getElementById('output');
+            const url = `${base}${path}`;
+            output.textContent = `Calling ${url} ...`;
+
+            try {
+              const response = await fetch(url, options);
+              const text = await response.text();
+              output.textContent = [
+                `HTTP ${response.status}`,
+                `URL: ${url}`,
+                '',
+                text
+              ].join('\n');
+            } catch (error) {
+              output.textContent = `Request failed: ${error.message}`;
+            }
+          }
+        </script>
+      </body>
+    </html>

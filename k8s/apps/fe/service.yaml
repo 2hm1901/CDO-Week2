@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cdo-nginx-app
-  namespace: cdo-nginx
+  name: cdo-fe-app
+  namespace: cdo-fe
   labels:
-    app: cdo-nginx-app
+    app: cdo-fe-app
 spec:
   selector:
-    app: cdo-nginx-app
+    app: cdo-fe-app
   ports:
     - name: http
       port: 80

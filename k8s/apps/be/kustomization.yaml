@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Kustomize gom các manifest của app thành một desired state để ArgoCD apply.
+# Kustomize gom các manifest của backend thành một desired state để ArgoCD apply.
 resources:
 - namespace.yaml
 - deployment.yaml
@@ -11,6 +11,6 @@ resources:
 
 # GitHub Actions sẽ cập nhật image tag sau mỗi lần merge vào main.
 images:
-- name: cdo-demo-app
-  newName: ghcr.io/2hm1901/cdo-demo-app
-  newTag: 1e779e7193fdbfdb41c7754052ee6f1f25deafb7
+  - name: cdo-be-app
+    newName: ghcr.io/2hm1901/cdo-be-app
+    newTag: ae64a1ec3aee7fdfa504371f8186287673c42e45

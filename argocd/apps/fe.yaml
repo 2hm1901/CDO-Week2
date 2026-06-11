@@ -1,21 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cdo-nginx-app
+  name: cdo-fe-app
   namespace: argocd
 spec:
-  # Child app thứ hai để minh hoạ app-of-apps quản lý nhiều Application.
+  # Child app frontend: nginx phục vụ UI tĩnh gọi BE API.
   project: default
   source:
-    # Git là desired state của nginx app.
+    # Git là desired state của FE app.
     repoURL: https://github.com/2hm1901/CDO-Week2.git
     targetRevision: main
-    # Manifest Kustomize riêng của nginx app.
-    path: k8s/apps/nginx
+    # Manifest Kustomize riêng của FE app.
+    path: k8s/apps/fe
   destination:
-    # Deploy nginx app vào namespace riêng để tách khỏi backend demo.
+    # Deploy FE app vào namespace riêng để minh hoạ multi-app.
     server: https://kubernetes.default.svc
-    namespace: cdo-nginx
+    namespace: cdo-fe
   syncPolicy:
     syncOptions:
       # Cho phép child app tự tạo namespace đích.

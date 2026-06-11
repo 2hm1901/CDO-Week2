@@ -1,21 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cdo-demo-app
+  name: cdo-be-app
   namespace: argocd
 spec:
-  # ArgoCD project mặc định đủ cho lab một app/một cluster.
+  # Child app backend: API có metrics/logs/SLO.
   project: default
   source:
     # Git là desired state. ArgoCD sẽ đọc manifest trong repo này.
     repoURL: https://github.com/2hm1901/CDO-Week2.git
     targetRevision: main
     # Thư mục chứa Kubernetes manifest được render bằng Kustomize.
-    path: k8s/apps/demo
+    path: k8s/apps/be
   destination:
     # Deploy vào chính cluster nơi ArgoCD đang chạy.
     server: https://kubernetes.default.svc
-    namespace: cdo-demo
+    namespace: cdo-be
   syncPolicy:
     syncOptions:
       # Cho phép ArgoCD tạo namespace nếu namespace chưa tồn tại.
