@@ -11,6 +11,6 @@ resources:
 
 # GitHub Actions sẽ cập nhật image tag sau mỗi lần merge vào main.
 images:
-  - name: cdo-be-app
-    newName: ghcr.io/2hm1901/cdo-be-app
-    newTag: ae64a1ec3aee7fdfa504371f8186287673c42e45
+- name: cdo-be-app
+  newName: ghcr.io/2hm1901/cdo-be-app
+  newTag: 8c24285ffd8ad595aeb3a4d7aee3438e0b7886ba
