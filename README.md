@@ -106,7 +106,7 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [k8s/apps/fe/configmap.yaml](./k8s/apps/fe/configmap.yaml): HTML/JS frontend gọi BE API.
 - [k8s/apps/fe/deployment.yaml](./k8s/apps/fe/deployment.yaml): Deployment nginx phục vụ FE.
 - [k8s/apps/fe/service.yaml](./k8s/apps/fe/service.yaml): Service nội bộ cho FE.
-- [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml): Helm values cài Prometheus, Alertmanager, Grafana và Loki datasource.
+- [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml): Helm values cài Prometheus, Alertmanager, Grafana, Loki datasource và email receiver cho SLO alerts.
 - [observability/loki-values.yaml](./observability/loki-values.yaml): Helm values cài Loki mode SingleBinary cho lab.
 - [observability/promtail-values.yaml](./observability/promtail-values.yaml): Helm values cài Promtail để đẩy container logs vào Loki.
 - [observability/grafana-dashboard-be.json](./observability/grafana-dashboard-be.json): dashboard Grafana mẫu cho request rate, error rate, p95 latency và logs của BE.
@@ -289,6 +289,32 @@ helm -n observability uninstall kube-prometheus-stack loki promtail
 ```
 
 Lệnh trên có thể báo release không tồn tại nếu bạn đang chạy trên cluster mới. Khi đó có thể bỏ qua.
+
+Trước khi sync Prometheus app, cấu hình email trong [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml):
+
+```yaml
+alertmanager:
+  config:
+    global:
+      smtp_smarthost: smtp.gmail.com:587
+      smtp_from: 2hm1901dev@gmail.com
+      smtp_auth_username: 2hm1901dev@gmail.com
+      smtp_auth_identity: 2hm1901dev@gmail.com
+    receivers:
+      - name: email-slo-alerts
+        email_configs:
+          - to: 2hm1901dev@gmail.com
+```
+
+Nếu dùng Gmail, tạo App Password trong Google Account và tạo Kubernetes Secret trên EC2. Không commit password này vào Git:
+
+```bash
+kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n observability create secret generic alertmanager-smtp \
+  --from-literal=smtp-password='YOUR_GMAIL_APP_PASSWORD'
+```
+
+Alertmanager sẽ gửi email khi các alert SLO/burn-rate trong [k8s/apps/be/prometheus-rule.yaml](./k8s/apps/be/prometheus-rule.yaml) firing, ví dụ `CdoBeAvailabilityFastBurn`, `CdoBeAvailabilitySlowBurn`, `CdoBeLatencyFastBurn`, `CdoBeLatencySlowBurn`.
 
 Apply root app nếu chưa apply:
 
@@ -556,6 +582,12 @@ File [k8s/apps/be/prometheus-rule.yaml](./k8s/apps/be/prometheus-rule.yaml) đ�
 - Latency SLO: 95% request có latency <= 500 ms, error budget 5%.
 - Fast burn alert: cửa sổ 5 phút và 1 giờ.
 - Slow burn alert: cửa sổ 30 phút và 6 giờ.
+
+Alertmanager trong [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml) nhận các alert này và gửi email qua receiver `email-slo-alerts`:
+
+- `severity="critical"`: gửi nhanh sau `10s`, repeat mỗi `30m`.
+- `severity="warning"`: gửi sau `30s`, repeat mỗi `4h`.
+- Khi alert resolved, email resolved cũng được gửi vì `send_resolved: true`.
 
 Tạo lỗi giả lập:
 
