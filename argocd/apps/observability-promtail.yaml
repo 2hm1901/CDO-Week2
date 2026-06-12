@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdo-observability-promtail
+  namespace: argocd
+  annotations:
+    # Promtail gửi log vào Loki gateway, nên sync sau Loki.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: promtail
+      # Promtail chart đã deprecated nhưng vẫn dùng trong lab để minh hoạ log pipeline cơ bản.
+      targetRevision: "*"
+      helm:
+        releaseName: promtail
+        valueFiles:
+          - $values/observability/promtail-values.yaml
+    - repoURL: https://github.com/2hm1901/CDO-Week2.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

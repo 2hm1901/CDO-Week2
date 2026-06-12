@@ -2,7 +2,7 @@
 
 Repo: <https://github.com/2hm1901/CDO-Week2>
 
-Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài Docker, Minikube, kubectl, Helm và clone repo này vào máy. Trên Minikube, lab cài ArgoCD, deploy app BE/FE bằng GitOps, cài Prometheus/Grafana/Loki/OpenTelemetry Collector, rồi thực hành drift, rollback, SLO và burn rate alert.
+Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài Docker, Minikube, kubectl, Helm và clone repo này vào máy. Trên Minikube, lab cài ArgoCD, deploy app BE/FE bằng GitOps, cài Prometheus/Grafana/Loki, rồi thực hành drift, rollback, SLO và burn rate alert.
 
 ## Mục Tiêu
 
@@ -15,7 +15,7 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - Sửa manifest trực tiếp bằng `kubectl` để tạo drift và quan sát ArgoCD `OutOfSync`.
 - Rollback đúng kiểu GitOps bằng `git revert`.
 - Thử `kubectl rollout undo` và hiểu vì sao thao tác này tạo drift trong GitOps.
-- Cài kube-prometheus-stack, Loki, Promtail, OpenTelemetry Collector.
+- Cài kube-prometheus-stack, Loki, Promtail.
 - Query request rate, error rate, latency, logs.
 - Tạo availability SLO, latency SLO và burn rate alert.
 - Thực hành Progressive Delivery với Argo Rollouts canary, AnalysisTemplate, Prometheus query và abort criteria.
@@ -38,7 +38,10 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 │   ├── root.yaml
 │   └── apps/
 │       ├── be.yaml
-│       └── fe.yaml
+│       ├── fe.yaml
+│       ├── observability-prometheus.yaml
+│       ├── observability-loki.yaml
+│       └── observability-promtail.yaml
 ├── k8s/
 │   └── apps/
 │       ├── be/
@@ -63,7 +66,6 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 │   ├── kube-prometheus-stack-values.yaml
 │   ├── loki-values.yaml
 │   ├── promtail-values.yaml
-│   ├── otel-collector-values.yaml
 │   └── grafana-dashboard-be.json
 └── terraform/
     ├── versions.tf
@@ -88,6 +90,9 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [argocd/root.yaml](./argocd/root.yaml): root ArgoCD Application áp dụng pattern app-of-apps, trỏ vào thư mục `argocd/apps`.
 - [argocd/apps/be.yaml](./argocd/apps/be.yaml): child ArgoCD Application trỏ vào repo GitHub và path `k8s/apps/be`.
 - [argocd/apps/fe.yaml](./argocd/apps/fe.yaml): child ArgoCD Application thứ hai, trỏ vào path `k8s/apps/fe`.
+- [argocd/apps/observability-prometheus.yaml](./argocd/apps/observability-prometheus.yaml): child ArgoCD Application cài `kube-prometheus-stack` bằng Helm chart và values trong repo.
+- [argocd/apps/observability-loki.yaml](./argocd/apps/observability-loki.yaml): child ArgoCD Application cài Loki bằng Helm chart và values trong repo.
+- [argocd/apps/observability-promtail.yaml](./argocd/apps/observability-promtail.yaml): child ArgoCD Application cài Promtail để thu log container và gửi vào Loki.
 - [k8s/apps/be/kustomization.yaml](./k8s/apps/be/kustomization.yaml): Kustomize entrypoint, gom manifest BE và quản lý image tag.
 - [k8s/apps/be/namespace.yaml](./k8s/apps/be/namespace.yaml): namespace `cdo-be`.
 - [k8s/apps/be/deployment.yaml](./k8s/apps/be/deployment.yaml): Deployment chạy BE app.
@@ -104,7 +109,6 @@ Lab này chạy trên AWS EC2. Terraform tạo một EC2 Ubuntu, user-data cài 
 - [observability/kube-prometheus-stack-values.yaml](./observability/kube-prometheus-stack-values.yaml): Helm values cài Prometheus, Alertmanager, Grafana và Loki datasource.
 - [observability/loki-values.yaml](./observability/loki-values.yaml): Helm values cài Loki mode SingleBinary cho lab.
 - [observability/promtail-values.yaml](./observability/promtail-values.yaml): Helm values cài Promtail để đẩy container logs vào Loki.
-- [observability/otel-collector-values.yaml](./observability/otel-collector-values.yaml): Helm values cài OpenTelemetry Collector với OTLP receiver và debug exporter.
 - [observability/grafana-dashboard-be.json](./observability/grafana-dashboard-be.json): dashboard Grafana mẫu cho request rate, error rate, p95 latency và logs của BE.
 - [.github/workflows/validate-pr.yaml](./.github/workflows/validate-pr.yaml): workflow chạy khi Pull Request, render Kustomize và validate manifest bằng kubeconform.
 - [.github/workflows/release-on-main.yaml](./.github/workflows/release-on-main.yaml): workflow chạy khi merge vào `main`, build image, push GHCR và commit image tag mới vào manifest.
@@ -196,7 +200,6 @@ Nếu EC2 đã được tạo từ version cũ của repo và user-data fail v�
 sudo -iu ubuntu minikube start --driver=docker --cpus=2 --memory=6144 --disk-size=25g
 sudo -iu ubuntu helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 sudo -iu ubuntu helm repo add grafana https://grafana.github.io/helm-charts
-sudo -iu ubuntu helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 sudo -iu ubuntu helm repo update
 sudo -iu ubuntu git clone https://github.com/2hm1901/CDO-Week2.git /home/ubuntu/CDO-Week2 || true
 sudo touch /var/log/cdo-week2-ready
@@ -265,60 +268,69 @@ $(terraform output -raw tunnel_command)
 - User: `admin`
 - Password: lấy từ secret `argocd-initial-admin-secret`.
 
-## 4. Cài Observability Stack
+## 4. Deploy Observability Stack Bằng ArgoCD
 
-Chạy trên EC2:
+Observability stack cũng được quản lý bằng ArgoCD app-of-apps. Root app sẽ tạo thêm ba child Application:
+
+- `cdo-observability-prometheus`: cài Prometheus, Alertmanager, Grafana và CRD `ServiceMonitor`/`PrometheusRule`.
+- `cdo-observability-loki`: cài Loki để lưu log.
+- `cdo-observability-promtail`: cài Promtail để đọc container log trên node và gửi vào Loki.
+
+Các app này dùng ArgoCD multi-source:
+
+- Source 1 là Helm chart từ Helm repo public.
+- Source 2 là Git repo này, dùng để lấy file values trong thư mục [observability](./observability).
+
+Nếu cluster đã từng cài observability bằng Helm thủ công, nên gỡ các release cũ trước khi để ArgoCD quản lý để tránh lệch ownership giữa Helm CLI và ArgoCD:
 
 ```bash
 cd ~/CDO-Week2
-kubectl create namespace observability
+helm -n observability uninstall kube-prometheus-stack loki promtail
 ```
 
-Cài Prometheus + Grafana:
+Lệnh trên có thể báo release không tồn tại nếu bạn đang chạy trên cluster mới. Khi đó có thể bỏ qua.
+
+Apply root app nếu chưa apply:
 
 ```bash
-helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  -n observability \
-  -f observability/kube-prometheus-stack-values.yaml
+kubectl apply -f argocd/root.yaml
 ```
 
-Cài Loki và Promtail:
+Sync root app để ArgoCD tạo các child Application:
 
 ```bash
-helm upgrade --install loki grafana/loki \
-  -n observability \
-  -f observability/loki-values.yaml
-
-helm upgrade --install promtail grafana/promtail \
-  -n observability \
-  -f observability/promtail-values.yaml
+kubectl -n argocd patch application cdo-week2-root \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
 
-Cài OpenTelemetry Collector:
+Sync các observability app bằng UI hoặc CLI:
 
 ```bash
-helm upgrade --install otel-collector open-telemetry/opentelemetry-collector \
-  -n observability \
-  -f observability/otel-collector-values.yaml
+kubectl -n argocd patch application cdo-observability-prometheus \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+
+kubectl -n argocd patch application cdo-observability-loki \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
+
+kubectl -n argocd patch application cdo-observability-promtail \
+  --type merge \
+  -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
 
 Kiểm tra:
 
 ```bash
+kubectl -n argocd get applications
 kubectl -n observability get pods
 ```
 
 Truy cập Grafana:
 
 ```bash
-kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80
-```
-
-Từ máy local:
-
-```bash
-cd terraform
-$(terraform output -raw tunnel_command)
+kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80 > /tmp/grafana-port-forward.log 2>&1 &
 ```
 
 Login Grafana:
@@ -338,10 +350,13 @@ cd ~/CDO-Week2
 kubectl apply -f argocd/root.yaml
 ```
 
-Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo hai child Application:
+Root app sẽ đọc thư mục [argocd/apps](./argocd/apps) và tạo các child Application:
 
 - `cdo-be-app`: backend API có metrics/logs/SLO.
 - `cdo-fe-app`: frontend tĩnh phục vụ bằng nginx, gọi BE API để tạo traffic/logs.
+- `cdo-observability-prometheus`: Prometheus, Alertmanager và Grafana.
+- `cdo-observability-loki`: Loki.
+- `cdo-observability-promtail`: Promtail.
 
 Sync root app trước:
 
@@ -351,7 +366,7 @@ kubectl -n argocd patch application cdo-week2-root \
   -p '{"operation":{"sync":{"revision":"HEAD"}}}'
 ```
 
-Sau đó sync từng child app bằng UI hoặc CLI:
+Sau đó sync từng child app bằng UI hoặc CLI. Nếu đã làm phần 4, chỉ cần sync hai app nghiệp vụ:
 
 ```bash
 kubectl -n argocd patch application cdo-be-app \

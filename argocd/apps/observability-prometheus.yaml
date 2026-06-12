@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdo-observability-prometheus
+  namespace: argocd
+  annotations:
+    # Tạo Prometheus/Grafana trước workload app để CRD ServiceMonitor/PrometheusRule sẵn sàng.
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      # Lab dùng latest chart tại thời điểm sync. Production nên pin chart version cụ thể.
+      targetRevision: "*"
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/observability/kube-prometheus-stack-values.yaml
+    - repoURL: https://github.com/2hm1901/CDO-Week2.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

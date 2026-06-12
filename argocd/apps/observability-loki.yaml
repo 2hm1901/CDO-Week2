@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdo-observability-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      # Lab dùng latest chart tại thời điểm sync. Production nên pin chart version cụ thể.
+      targetRevision: "*"
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/observability/loki-values.yaml
+    - repoURL: https://github.com/2hm1901/CDO-Week2.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
