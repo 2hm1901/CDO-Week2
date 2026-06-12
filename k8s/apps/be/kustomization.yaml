@@ -13,4 +13,4 @@ resources:
 images:
 - name: cdo-be-app
   newName: ghcr.io/2hm1901/cdo-be-app
-  newTag: 6164bf4497bb7407f6a0cb24b90db7979dea07fc
+  newTag: 1c9f201eec58bcb6e3e1ee2752f2b991ecc38a6b
